@@ -25,26 +25,26 @@ A production-grade full-stack AI system for Kerala Police officers — providing
 
 ```
 ┌──────────────────────────────────────────────────┐
-│           React + Vite + Tailwind Frontend        │
+│           React + Vite + Tailwind Frontend       │
 │      Officer Login · Dashboard · FIR Analysis    │
 │   Case Intelligence · Legal Chat · Malayalam FIR │
 └─────────────────────┬────────────────────────────┘
                       │  REST API (JSON over HTTP)
                       │  Vite dev proxy → localhost:8000
 ┌─────────────────────▼────────────────────────────┐
-│               FastAPI Backend (Python)            │
+│               FastAPI Backend (Python)           │
 │  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
 │  │ FIR API  │  │ Analysis │  │  Legal / MO    │  │
 │  └────┬─────┘  └────┬─────┘  └───────┬────────┘  │
-│       │             │                 │            │
+│       │             │                 │          │
 │  ┌────▼──────┐ ┌────▼───────┐ ┌──────▼────────┐  │
 │  │PostgreSQL │ │  ChromaDB  │ │ Bhashini API  │  │
 │  │(Case DB)  │ │(FIR vectors│ │  (Malayalam)  │  │
 │  └───────────┘ └────────────┘ └───────────────┘  │
-│                      │                            │
-│               ┌──────▼────────┐                   │
-│               │  Celery+Redis │ (async training)  │
-│               └───────────────┘                   │
+│                      │                           │
+│               ┌──────▼────────┐                  │
+│               │  Celery+Redis │ (async training) │
+│               └───────────────┘                  │
 └──────────────────────────────────────────────────┘
 ```
 
