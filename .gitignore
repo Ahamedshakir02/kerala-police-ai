@@ -1,0 +1,58 @@
+# Environments
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv
+venv/
+ENV/
+
+# Node / Frontend
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+dist-ssr/
+*.local
+
+# Docker Volumes mapped locally
+postgres_data/
+chroma_data/
+model_cache/
+.chroma/
+
+# Database / Models
+*.sqlite3
+*.db
+.model_cache/
+
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log

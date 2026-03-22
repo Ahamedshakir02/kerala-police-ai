@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-50 text-gray-800 font-sans antialiased;
+  }
+}
+
+@layer components {
+  /* Ultra-soft glass/white cards */
+  .premium-card {
+    @apply bg-white rounded-3xl border border-gray-100 shadow-soft transition-all duration-300;
+  }
+  
+  .premium-button {
+    @apply bg-brand-800 text-white rounded-xl font-medium px-6 py-3 hover:bg-brand-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Form inputs */
+  .premium-input {
+    @apply w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-800/20 focus:border-brand-800 transition-all;
+  }
+
+  /* Status Colors */
+  .status-badge {
+    @apply px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border;
+  }
+
+  .risk-critical {
+    @apply text-red-700 bg-red-50 border-red-200;
+  }
+  .risk-high {
+    @apply text-orange-700 bg-orange-50 border-orange-200;
+  }
+  .risk-medium {
+    @apply text-amber-700 bg-amber-50 border-amber-200;
+  }
+  .risk-low {
+    @apply text-emerald-700 bg-emerald-50 border-emerald-200;
+  }
+
+  /* Scrollbars - soft gray */
+  .scroll-y {
+    @apply overflow-y-auto scroll-smooth;
+  }
+  .scroll-y::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scroll-y::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-y::-webkit-scrollbar-thumb {
+    @apply bg-gray-200 rounded-full;
+  }
+  .scroll-y::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-300;
+  }
+}

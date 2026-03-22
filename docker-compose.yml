@@ -1,0 +1,113 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: kpai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kpai
+      POSTGRES_PASSWORD: kpai_secret
+      POSTGRES_DB: kpai_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kpai -d kpai_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kpai_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── ChromaDB ────────────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: kpai_chroma
+    restart: unless-stopped
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "8001:8000"
+
+  # ── FastAPI Backend ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kpai_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kpai:kpai_secret@postgres:5432/kpai_db
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - model_cache:/app/.model_cache
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Celery Worker ───────────────────────────────────────────────
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kpai_celery
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kpai:kpai_secret@postgres:5432/kpai_db
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - model_cache:/app/.model_cache
+    depends_on:
+      - redis
+      - postgres
+      - chromadb
+    command: celery -A app.tasks.train_pipeline:celery_app worker --loglevel=info --concurrency=2
+
+  # ── React Frontend ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kpai_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  chroma_data:
+  model_cache:
