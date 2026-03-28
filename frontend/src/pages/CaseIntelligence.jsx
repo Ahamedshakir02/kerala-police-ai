@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { firsAPI, analysisAPI } from '../api'
 import toast from 'react-hot-toast'
-import { Search, RefreshCw, Scale, Link2, FileText, ChevronRight } from 'lucide-react'
+import { Search, RefreshCw, Scale, Link2, FileText, ChevronRight, AlertTriangle } from 'lucide-react'
 
 const RISK_CONFIG = {
   critical: { cls: 'risk-critical', label: 'Critical' },

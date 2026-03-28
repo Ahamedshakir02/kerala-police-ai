@@ -19,7 +19,8 @@ export default function Login() {
       const res = await login(badgeId, password)
       if (res.success) {
         toast.success('Authentication successful')
-        navigate('/')
+        // Navigation is handled automatically by App.jsx route:
+        // officer ? <Navigate to="/" /> : <Login />
       } else {
         toast.error(res.error)
       }

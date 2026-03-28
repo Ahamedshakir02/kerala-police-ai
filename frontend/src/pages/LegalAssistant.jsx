@@ -4,12 +4,16 @@ import toast from 'react-hot-toast'
 import { BookOpen, Sparkles, Send, Scale, FileText, ChevronRight } from 'lucide-react'
 
 const QUICK_QUERIES = [
-  { label: 'Bail Sec 167 CrPC', q: 'What are the bail provisions under Section 167 CrPC? When does default bail apply?' },
-  { label: 'FIR Registration Map', q: 'Is it mandatory to register FIR for every cognizable offence? What does Lalita Kumari say?' },
-  { label: 'Cybercrime Toolkit', q: 'What are the IPC and IT Act sections for online fraud, OTP fraud, and phishing?' },
-  { label: 'Murder Investigation SOP', q: 'What evidence is required for a murder case under IPC 302? What are the investigation steps?' },
-  { label: 'Arrest Protocol Guidelines', q: 'What are the arrest guidelines from D.K. Basu case? What are rights of arrested person?' },
-  { label: 'NDPS Act Procedures', q: 'What are NDPS Act sections for cannabis and psychotropic substances? What are the penalties?' },
+  { label: 'Bail — Sec 167 CrPC', q: 'What are the bail provisions under Section 167 CrPC? When does default bail apply?' },
+  { label: 'FIR Registration Mandatory', q: 'Is it mandatory to register FIR for every cognizable offence? What does Lalita Kumari say?' },
+  { label: 'Cybercrime — IPC & IT Act', q: 'What are the IPC and IT Act sections for online fraud, OTP fraud, and phishing?' },
+  { label: 'Motor Accident Death', q: 'What sections apply when someone dies in a road accident due to rash driving?' },
+  { label: 'Drunk Driving — MVA', q: 'What is the punishment for drunk driving under the Motor Vehicles Act?' },
+  { label: 'BNS vs IPC — New Laws', q: 'What is the Bharatiya Nyaya Sanhita? How does it replace IPC? What changed?' },
+  { label: 'POCSO — Child Abuse', q: 'What are POCSO Act sections for sexual assault on children? What is the reporting obligation?' },
+  { label: 'Dowry & 498A Guidelines', q: 'What are the arrest guidelines for Section 498A IPC dowry cases? Arnesh Kumar judgment?' },
+  { label: 'Arrest Protocol — D.K. Basu', q: 'What are the arrest guidelines from D.K. Basu case? What are rights of arrested person?' },
+  { label: 'NDPS Act — Narcotics', q: 'What are NDPS Act sections for cannabis and psychotropic substances? What are the penalties?' },
 ]
 
 function MessageBubble({ msg }) {

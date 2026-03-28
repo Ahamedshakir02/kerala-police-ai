@@ -57,6 +57,12 @@ export default function MOPatterns() {
           
           <div className="flex-1 overflow-y-auto scroll-y space-y-3 pb-8 pr-1">
             {loading ? [...Array(6)].map((_, i) => <div key={i} className="h-28 bg-white border border-gray-100 rounded-2xl animate-pulse"></div>) :
+            patterns.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm font-bold text-gray-500">No patterns detected</p>
+                <p className="text-xs text-gray-400 mt-1">Upload FIRs to detect MO clusters</p>
+              </div>
+            ) :
             patterns.map(p => {
               const styles = RISK_STYLES[p.risk_level] || RISK_STYLES.low
               return (

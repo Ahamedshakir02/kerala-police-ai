@@ -6,18 +6,189 @@ A production-grade full-stack AI system for Kerala Police officers — providing
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Tech Stack](#tech-stack)
-3. [Project Structure](#project-structure)
-4. [How to Run](#how-to-run)
+1. [About This Project](#about-this-project)
+2. [Project Build Journey — Step by Step](#project-build-journey--step-by-step)
+3. [Architecture Overview](#architecture-overview)
+4. [Tech Stack](#tech-stack)
+5. [Project Structure](#project-structure)
+6. [File Connection Map — How Every File Links Together](#file-connection-map--how-every-file-links-together)
+7. [How to Run](#how-to-run)
    - [Option A — Docker (recommended)](#option-a--docker-recommended)
    - [Option B — Manual (local dev)](#option-b--manual-local-dev)
-5. [Environment Variables](#environment-variables)
-6. [Backend — Detailed Code Walkthrough](#backend--detailed-code-walkthrough)
-7. [Frontend — Detailed Code Walkthrough](#frontend--detailed-code-walkthrough)
-8. [API Reference](#api-reference)
-9. [How the AI Pipeline Works](#how-the-ai-pipeline-works)
-10. [First-Time Usage](#first-time-usage)
+8. [Environment Variables](#environment-variables)
+9. [Backend — Detailed Code Walkthrough](#backend--detailed-code-walkthrough)
+10. [Frontend — Detailed Code Walkthrough](#frontend--detailed-code-walkthrough)
+11. [API Reference](#api-reference)
+12. [How the AI Pipeline Works](#how-the-ai-pipeline-works)
+13. [Data Flow — Request Lifecycle](#data-flow--request-lifecycle)
+14. [Design Decisions & Why](#design-decisions--why)
+15. [First-Time Usage](#first-time-usage)
+
+---
+
+## About This Project
+
+**Kerala Police AI Investigation Assistant (KPAIA)** is a full-stack AI web application designed to assist Kerala Police officers in their day-to-day investigation workflows. The system combines **Natural Language Processing (NLP)**, **vector similarity search**, and a **curated Indian legal knowledge base** to automate tasks that traditionally require hours of manual effort.
+
+### What Problems Does It Solve?
+
+| Problem | How KPAIA Solves It |
+|---|---|
+| Officers manually read through FIRs to identify relevant IPC sections | AI automatically classifies IPC/CrPC/BNS sections with confidence scores |
+| No easy way to find similar past cases across districts | Semantic vector search finds similar FIRs using ChromaDB embeddings |
+| Identifying crime patterns (like serial chain-snatching) takes weeks | MO pattern engine detects modus operandi clusters in real-time |
+| Legal knowledge is scattered across books and manuals | Built-in knowledge base with IPC, CrPC, BNS, POCSO, MVA, and landmark judgments |
+| FIRs need to be drafted in Malayalam for Kerala courts | Bhashini API integration translates English FIRs to Malayalam instantly |
+| No centralized dashboard for crime intelligence | Live dashboard with risk breakdown, district stats, and pattern alerts |
+
+### Core Features
+
+1. **FIR Analysis** — Upload a FIR (PDF or text) → AI extracts entities (complainant, accused, location, weapon), suggests IPC sections, assigns risk level, and detects MO patterns
+2. **Case Intelligence** — Browse all indexed FIRs with filters, find semantically similar cases using vector search
+3. **MO Pattern Alerts** — Detect crime clusters like OTP fraud, chain snatching, house breaking across districts
+4. **Legal Assistant** — Search IPC, CrPC, BNS, POCSO, Motor Vehicles Act, and landmark Supreme Court judgments
+5. **Malayalam FIR Drafting** — Convert English FIR content to formatted Malayalam using Bhashini (Government of India NLP API)
+6. **Officer Authentication** — JWT-based login with role hierarchy (Constable → Sub Inspector → Inspector → DSP → SP → Admin)
+
+---
+
+## Project Build Journey — Step by Step
+
+This section explains the **logical order** in which the project was designed and built, and **why** each step was taken.
+
+### Step 1: Define the Problem & Plan the Architecture
+
+**Goal:** Understand what Kerala Police officers need most — fast FIR analysis, legal lookup, and case similarity search.
+
+**Decision:** Use a full-stack architecture with:
+- **React frontend** for the officer-facing UI
+- **FastAPI backend** for async API performance
+- **PostgreSQL** for relational data (officers, FIRs, cases)
+- **ChromaDB** for vector similarity search
+- **Celery + Redis** for background processing of heavy ML tasks
+
+### Step 2: Set Up the Backend Foundation
+
+**Files created:**
+- `backend/main.py` — FastAPI app with lifespan hook for startup tasks
+- `backend/app/core/config.py` — Centralized settings using `pydantic-settings` (reads `.env`)
+- `backend/app/core/database.py` — Async SQLAlchemy engine with PostgreSQL (`asyncpg` driver)
+- `backend/app/core/security.py` — JWT token creation/validation + bcrypt password hashing
+
+**Why this order?** Config must come first because every other module imports `settings`. Database comes next because models depend on the `Base` class. Security comes third because the auth API depends on password hashing and JWT functions.
+
+### Step 3: Define the Database Models
+
+**Files created:**
+- `backend/app/models/officer.py` — Officers table with badge number, station, district, role hierarchy, and bcrypt password hash
+- `backend/app/models/fir.py` — FIRs table with raw text, extracted entities (JSON), IPC sections (JSON), risk level, MO pattern, embedding ID, and status tracking
+- `backend/app/models/case.py` — Cases table (one-to-one with FIR) with investigation status, court tracking, and officer assignment
+
+**Why?** The data model must be defined before any API or service code. The FIR model is the most complex — it stores both raw data and all AI-computed fields (entities, IPC sections, risk, MO pattern, embedding reference).
+
+**Key relationship:** `Officer` → (has many) → `FIR` → (has one) → `Case`
+
+### Step 4: Define Request/Response Schemas
+
+**File created:**
+- `backend/app/schemas/schemas.py` — All Pydantic models for API validation
+
+**Contains:** `LoginRequest`, `TokenResponse`, `OfficerCreate`, `OfficerOut`, `FIRCreate`, `FIROut`, `FIRListItem`, `AnalysisRequest`, `AnalysisResponse`, `SimilarFIR`, `LegalSearchRequest`, `LegalSearchResponse`, `TranslationRequest`, `TranslationResponse`, `DashboardStats`, `MOPattern`
+
+**Why separate from models?** SQLAlchemy models define the database schema. Pydantic schemas define the API contract (what the frontend sends/receives). They're intentionally different — for example, `OfficerOut` excludes `hashed_password`.
+
+### Step 5: Build the AI/ML Services (The Intelligence Core)
+
+**Files created (in dependency order):**
+
+1. **`backend/app/services/nlp_service.py`** (445 lines) — The heart of the system
+   - Hand-curated **IPC Knowledge Base** with 24 sections (IPC 302–509, IT Act 66–67, NDPS Act 20–22)
+   - Each section has keywords, title, description, punishment, bailable status
+   - `extract_entities()` — spaCy NER + regex fallback for complainant, accused, location, weapon, vehicle, property
+   - `suggest_ipc_sections()` — Keyword scoring engine with confidence calculation
+   - `detect_mo_pattern()` — Rule-based pattern detection (ATM skimming, OTP fraud, chain snatching, etc.)
+   - `generate_summary()` — Structured AI summary from entities + IPC sections
+   - `generate_next_steps()` — Investigation steps tailored to crime type
+
+2. **`backend/app/services/embedding_service.py`** — Sentence-transformer encoder
+   - Model: `paraphrase-multilingual-MiniLM-L12-v2` (supports English + Malayalam)
+   - Encodes FIR text into 384-dimensional normalized vectors
+   - Singleton pattern — model loads once at startup, stays in memory
+
+3. **`backend/app/services/chroma_service.py`** — ChromaDB vector store client
+   - Uses `fir_embeddings` collection with cosine distance
+   - `upsert_fir()` stores vector + metadata (case number, district, risk)
+   - `search_similar()` finds top-K nearest FIRs by cosine similarity
+   - Graceful fallback if ChromaDB is unreachable
+
+4. **`backend/app/services/bhashini_service.py`** — Bhashini/IndicTrans2 translation
+   - Calls the Government of India Bhashini Dhruva API for English → Malayalam
+   - Falls back to realistic Malayalam mock if API key not configured
+   - Mock includes proper Malayalam FIR structure with key term translations
+
+5. **`backend/app/services/training_service.py`** — FIR ingestion pipeline orchestrator
+   - `ingest_fir()` chains all services: NLP → Embedding → ChromaDB → DB update
+   - Also includes `extract_text_from_pdf()` using pdfplumber
+
+**Why this order?** Each service is independent and stateless. The training service depends on all three AI services (NLP, embedding, ChromaDB), so it must come last.
+
+### Step 6: Build the API Endpoints
+
+**Files created:**
+- `backend/app/api/auth.py` — Login, register, seed-demo, get-me
+- `backend/app/api/firs.py` — Upload, list, get, train (triggers ingestion pipeline)
+- `backend/app/api/analysis.py` — Real-time FIR analysis + semantic similarity search
+- `backend/app/api/legal.py` — Legal knowledge base search (IPC, CrPC, BNS, POCSO, MVA, judgments)
+- `backend/app/api/patterns.py` — MO pattern detection across all FIRs
+- `backend/app/api/dashboard.py` — Live statistics (7 async DB queries)
+- `backend/app/api/bhashini.py` — Translation proxy endpoint
+
+**All routes** require JWT authentication (`Depends(get_current_officer)`) except login, seed-demo, and health check.
+
+### Step 7: Set Up the Celery Background Worker
+
+**File created:**
+- `backend/app/tasks/train_pipeline.py` — Celery task wrapper
+
+**Why Celery?** FIR ingestion involves heavy ML operations (spaCy NER + sentence-transformer encoding + ChromaDB upsert). For single FIRs, FastAPI's `BackgroundTasks` works fine. But for bulk uploads or re-training, Celery + Redis provides a proper distributed task queue with retries and monitoring.
+
+### Step 8: Build the React Frontend
+
+**Files created (in dependency order):**
+
+1. **`frontend/src/main.jsx`** — React 18 root with `react-hot-toast` provider
+2. **`frontend/src/styles/index.css`** — Tailwind CSS config + custom Kerala Police theme (navy/gold)
+3. **`frontend/src/api/index.js`** — Axios client with JWT interceptor and all API helper functions
+4. **`frontend/src/components/AuthContext.jsx`** — React Context for officer login state (persists in localStorage)
+5. **`frontend/src/components/Layout.jsx`** — Sidebar navigation + topbar + user card
+6. **`frontend/src/App.jsx`** — BrowserRouter with route definitions and `PrivateRoute` guard
+7. **Pages (each is a self-contained feature):**
+   - `Login.jsx` — Officer login form
+   - `Dashboard.jsx` — Stats + charts + MO alerts
+   - `FIRAnalysis.jsx` — FIR upload/paste → AI analysis results
+   - `CaseIntelligence.jsx` — Browse and search indexed FIRs
+   - `MOPatterns.jsx` — Crime pattern alerts dashboard
+   - `LegalAssistant.jsx` — Chat-style legal query interface
+   - `MalayalamFIR.jsx` — English → Malayalam FIR generator
+   - `RequestAccess.jsx` — New officer registration request
+
+### Step 9: Containerize Everything with Docker
+
+**Files created:**
+- `backend/Dockerfile` — Python 3.11-slim image with pip requirements
+- `frontend/Dockerfile` — Multi-stage build: Node 20 (build) → Nginx (serve), with API proxy config
+- `docker-compose.yml` — Orchestrates 6 services: PostgreSQL, Redis, ChromaDB, Backend, Celery Worker, Frontend
+
+### Step 10: Configuration & Documentation
+
+**Files created:**
+- `.env.example` / `.env` — All environment variables
+- `backend/setup.ps1` — PowerShell setup script for Windows local dev
+- `backend/start.ps1` — PowerShell script to start the backend
+- `backend/scripts/upload_firs.py` — Bulk FIR upload utility
+- `backend/tests/test_auth.py` — Pytest auth endpoint tests
+- `backend/tests/sample_fir.txt` — Realistic FIR text for testing
+- `README.md` — This file
 
 ---
 
@@ -64,7 +235,7 @@ A production-grade full-stack AI system for Kerala Police officers — providing
 | Migrations | Alembic | Schema versioning |
 | Malayalam NLP | Bhashini API (IndicTrans2) | Government of India NLP translation pipeline |
 | Background Jobs | Celery + Redis | Async FIR ingestion/training pipeline |
-| Auth | JWT (python-jose) + bcrypt (passlib) | Stateless officer login |
+| Auth | JWT (python-jose) + bcrypt | Stateless officer login |
 | PDF extraction | pdfplumber | Extracts text from uploaded FIR PDFs |
 | Containerisation | Docker + docker-compose | One-command startup of all 6 services |
 
@@ -81,6 +252,8 @@ kerala-police-ai/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── main.py                 ← FastAPI app entry point
+│   ├── setup.ps1               ← Windows local dev setup script
+│   ├── start.ps1               ← Windows local dev start script
 │   │
 │   └── app/
 │       ├── core/
@@ -107,7 +280,7 @@ kerala-police-ai/
 │       │   ├── auth.py         ← POST /api/auth/login, GET /me
 │       │   ├── firs.py         ← FIR upload, list, get, train
 │       │   ├── analysis.py     ← NLP analysis + similarity search
-│       │   ├── legal.py        ← IPC/CrPC/judgment search
+│       │   ├── legal.py        ← IPC/CrPC/BNS/POCSO/judgment search
 │       │   ├── patterns.py     ← MO pattern clustering
 │       │   ├── dashboard.py    ← Live stats
 │       │   └── bhashini.py     ← Translation proxy
@@ -115,11 +288,18 @@ kerala-police-ai/
 │       └── tasks/
 │           └── train_pipeline.py   ← Celery async task wrapper
 │
-├── tests/
-│   ├── test_auth.py            ← Pytest auth endpoint tests
-│   └── sample_fir.txt          ← Realistic FIR for testing
+│   ├── scripts/
+│   │   └── upload_firs.py      ← Bulk FIR upload utility
+│   │
+│   ├── tests/
+│   │   ├── test_auth.py        ← Pytest auth endpoint tests
+│   │   └── sample_fir.txt      ← Realistic FIR for testing
+│   │
+│   └── fir_data/
+│       └── README.md           ← Instructions for FIR data files
 │
 └── frontend/
+    ├── Dockerfile              ← Multi-stage: Node build → Nginx serve
     ├── package.json
     ├── vite.config.js          ← Dev server + proxy to :8000
     ├── tailwind.config.js      ← Kerala Police navy/gold theme
@@ -135,16 +315,179 @@ kerala-police-ai/
         │
         ├── components/
         │   ├── AuthContext.jsx  ← React context for officer login state
-        │   └── Layout.jsx      ← Collapsible sidebar + topbar wrapper
+        │   └── Layout.jsx      ← Sidebar + topbar wrapper
         │
         └── pages/
             ├── Login.jsx           ← Officer login (badge + password)
+            ├── RequestAccess.jsx   ← New officer registration request
             ├── Dashboard.jsx       ← Live stats, charts, MO alerts
             ├── FIRAnalysis.jsx     ← Upload/paste FIR → AI analysis
             ├── CaseIntelligence.jsx← Browse indexed FIRs + similarity
             ├── MOPatterns.jsx      ← Crime pattern alerts + detail
             ├── LegalAssistant.jsx  ← Chat UI for IPC/CrPC queries
             └── MalayalamFIR.jsx    ← English form → Malayalam FIR
+```
+
+---
+
+## File Connection Map — How Every File Links Together
+
+This section shows exactly **how each file imports from and depends on other files**. Understanding these connections is essential for modifying the codebase.
+
+### Backend File Dependencies
+
+```
+.env
+  └── read by → config.py (via pydantic-settings)
+
+config.py (settings singleton)
+  └── imported by → database.py, security.py, embedding_service.py,
+                     chroma_service.py, bhashini_service.py, train_pipeline.py
+
+database.py (Base class + get_db dependency + engine)
+  └── imported by → ALL models (officer.py, fir.py, case.py)
+  └── imported by → ALL api endpoints (via get_db dependency)
+  └── imported by → training_service.py, train_pipeline.py
+
+security.py (JWT + bcrypt + get_current_officer dependency)
+  └── imported by → ALL api endpoints (via get_current_officer)
+  └── imports ← config.py (for SECRET_KEY, ALGORITHM)
+  └── imports ← database.py (for get_db)
+  └── imports ← models/officer.py (to look up officer from JWT)
+
+models/officer.py (Officer ORM model)
+  └── imports ← database.py (Base)
+  └── imported by → security.py, auth.py, all API files (via get_current_officer)
+  └── has relationship → fir.py (Officer.firs ↔ FIR.officer)
+
+models/fir.py (FIR ORM model)
+  └── imports ← database.py (Base)
+  └── imported by → firs.py, analysis.py, dashboard.py, patterns.py, training_service.py
+  └── has relationship → officer.py (FIR.officer ↔ Officer.firs)
+  └── has relationship → case.py (FIR.case ↔ Case.fir)
+
+models/case.py (Case ORM model)
+  └── imports ← database.py (Base)
+  └── imported by → dashboard.py
+  └── has relationship → fir.py (Case.fir ↔ FIR.case)
+
+schemas/schemas.py (all Pydantic models)
+  └── imports ← models/officer.py (OfficerRole enum)
+  └── imported by → ALL api endpoints
+
+services/nlp_service.py → STANDALONE (no internal imports)
+  └── imported by → training_service.py, analysis.py
+  └── exports → IPC_KNOWLEDGE_BASE (also imported by legal.py)
+
+services/embedding_service.py
+  └── imports ← config.py (model name, cache dir)
+  └── imported by → training_service.py, analysis.py
+
+services/chroma_service.py
+  └── imports ← config.py (host, port)
+  └── imported by → training_service.py, analysis.py, dashboard.py
+
+services/bhashini_service.py
+  └── imports ← config.py (API key, user ID)
+  └── imported by → api/bhashini.py
+
+services/training_service.py (THE ORCHESTRATOR)
+  └── imports ← nlp_service.py + embedding_service.py + chroma_service.py
+  └── imports ← models/fir.py
+  └── imported by → api/firs.py (BackgroundTask), tasks/train_pipeline.py (Celery)
+
+tasks/train_pipeline.py
+  └── imports ← config.py (Redis URL), database.py, training_service.py
+  └── used by → Celery worker process (docker-compose command)
+
+main.py (APP ENTRY POINT)
+  └── imports ← ALL api routers (auth, firs, analysis, legal, patterns, dashboard, bhashini)
+  └── imports ← config.py, database.py
+  └── imports ← embedding_service.py (warmup), chroma_service.py (init)
+  └── registers all routes under /api/... prefixes
+```
+
+### Frontend File Dependencies
+
+```
+main.jsx (ENTRY POINT)
+  └── imports ← App.jsx, styles/index.css
+  └── renders App inside React.StrictMode + Toaster
+
+App.jsx (ROUTER)
+  └── imports ← AuthContext.jsx (AuthProvider + useAuth)
+  └── imports ← Layout.jsx
+  └── imports ← ALL page components
+  └── defines PrivateRoute (checks officer state → redirects to /login if null)
+  └── defines AppRoutes (maps URL paths to page components)
+
+api/index.js (AXIOS CLIENT)
+  └── creates Axios instance with baseURL '/api'
+  └── request interceptor: attaches JWT from localStorage
+  └── response interceptor: on 401, clears auth and redirects to /login
+  └── exports: authAPI, firsAPI, analysisAPI, legalAPI, patternsAPI,
+               dashboardAPI, bhashiniAPI
+  └── imported by → AuthContext.jsx, Layout.jsx, ALL page components
+
+components/AuthContext.jsx
+  └── imports ← api/index.js (authAPI)
+  └── provides: { officer, login, logout, loading } via React Context
+  └── imported by → App.jsx (AuthProvider), Login.jsx (useAuth)
+  └── persists officer in localStorage for page refresh survival
+
+components/Layout.jsx
+  └── imports ← api/index.js (authAPI.me)
+  └── renders sidebar navigation, topbar, user card, logout
+  └── wraps ALL authenticated pages (passed as children prop from App.jsx)
+
+pages/Login.jsx → uses authAPI.login() via AuthContext.login()
+pages/Dashboard.jsx → uses dashboardAPI.getStats() + patternsAPI.getMOAlerts()
+pages/FIRAnalysis.jsx → uses analysisAPI.analyzeFIR() + firsAPI.upload()
+pages/CaseIntelligence.jsx → uses firsAPI.list() + firsAPI.get() + analysisAPI.getSimilar()
+pages/MOPatterns.jsx → uses patternsAPI.getMOAlerts()
+pages/LegalAssistant.jsx → uses legalAPI.search()
+pages/MalayalamFIR.jsx → uses bhashiniAPI.translate()
+pages/RequestAccess.jsx → standalone form (no API call yet)
+```
+
+### Cross-Stack Connection: Frontend ↔ Backend
+
+```
+Frontend (port 5173)          Backend (port 8000)
+─────────────────────         ─────────────────────
+api/index.js                  
+  baseURL: '/api'    ──────→  Vite proxy OR Nginx proxy
+                              ──────→ main.py routes:
+authAPI.login()      ──────→  POST /api/auth/login     → auth.py
+authAPI.me()         ──────→  GET  /api/auth/me         → auth.py
+authAPI.seedDemo()   ──────→  POST /api/auth/seed-demo  → auth.py
+firsAPI.upload()     ──────→  POST /api/firs/upload     → firs.py
+firsAPI.list()       ──────→  GET  /api/firs/           → firs.py
+firsAPI.get(id)      ──────→  GET  /api/firs/{id}       → firs.py
+firsAPI.train(id)    ──────→  POST /api/firs/{id}/train → firs.py
+analysisAPI.analyzeFIR() ──→  POST /api/analysis/analyze-fir → analysis.py
+analysisAPI.getSimilar() ──→  GET  /api/analysis/similar/{id} → analysis.py
+legalAPI.search()    ──────→  POST /api/legal/search    → legal.py
+patternsAPI.getMOAlerts()──→  GET  /api/patterns/mo-alerts → patterns.py
+dashboardAPI.getStats()  ──→  GET  /api/dashboard/stats → dashboard.py
+dashboardAPI.getChromaStats()→GET /api/dashboard/chroma-stats → dashboard.py
+bhashiniAPI.translate()  ──→  POST /api/bhashini/translate → bhashini.py
+```
+
+### Docker Service Dependencies
+
+```
+docker-compose.yml orchestrates:
+
+postgres (port 5432)     ← no dependencies
+redis (port 6379)        ← no dependencies
+chromadb (port 8001)     ← no dependencies
+backend (port 8000)      ← depends on: postgres (healthy), redis (healthy), chromadb
+celery_worker            ← depends on: postgres, redis, chromadb
+frontend (port 5173→80)  ← depends on: backend
+
+Frontend Nginx config proxies /api/* → http://backend:8000
+Backend connects to postgres, redis, chromadb via Docker service names
 ```
 
 ---
@@ -291,7 +634,7 @@ Uses **pydantic-settings** `BaseSettings` to read every config value from `.env`
 - `get_db()` is a FastAPI dependency that yields a session per request, commits on success, rolls back on error
 
 #### `security.py`
-- `get_password_hash()` / `verify_password()` — bcrypt hashing via passlib
+- `get_password_hash()` / `verify_password()` — bcrypt hashing
 - `create_access_token()` — encodes officer badge number + role into a signed JWT
 - `get_current_officer()` — FastAPI dependency that decodes the JWT from the `Authorization: Bearer` header and fetches the officer from DB
 
@@ -427,12 +770,15 @@ Contains a large in-file knowledge base with:
 - 24 IPC sections (from `nlp_service.py`)
 - 7 CrPC provisions (Sec 41, 57, 154, 161, 167, 173, 436A)
 - 3 landmark judgments (D.K. Basu, Lalita Kumari, Arnesh Kumar)
-- 2 SOPs (BPR&D crime scene management, Kerala Police CCTNS)
+- 6 Motor Vehicles Act sections (drunk driving, dangerous driving, hit-and-run, etc.)
+- 5 BNS/BNSS sections (new criminal laws effective 1 July 2024)
+- 3 POCSO sections (child sexual abuse, mandatory reporting)
+- 2 Domestic Violence provisions (DV Act 2005, IPC 498A)
 
 `search_legal_kb(query)` scores each item by keyword matches + title match and returns the top 5 with a structured answer + citation.
 
 #### `patterns.py`
-Defines 6 known MO cluster patterns (OTP fraud, chain snatching, house breaking, etc.). On each request, scans all FIRs in the DB for keyword matches and returns occurrence counts per district. Results are sorted by risk level.
+Defines 6 known MO cluster patterns (OTP fraud, chain snatching, house breaking, romance fraud, ATM skimming, narcotics network). On each request, scans all FIRs in the DB for keyword matches and returns occurrence counts per district. Results are sorted by risk level.
 
 #### `dashboard.py`
 Runs 7 async DB queries (total FIRs, indexed count, case statuses, risk breakdown, district breakdown, today's count) and returns them as a single `DashboardStats` object.
@@ -456,22 +802,23 @@ React Context that holds the logged-in officer object. `login()` calls the API, 
 ### `src/components/Layout.jsx`
 
 The persistent chrome around all pages:
-- **Sidebar** with collapsible toggle (stores state in component, slides between w-64 and w-16)
+- **Sidebar** with navigation menu (Dashboard, FIR Analysis, Case Intelligence, MO Patterns, Legal Assistant, Malayalam FIR)
 - **Active route highlighting** via `useLocation()`
 - **Officer card** at the bottom with initials avatar and logout button
-- **Topbar** with current page title, system online indicator, and badge number
+- **Topbar** with current page title, search bar, and notification bell
 
 ### Page Components
 
 | Page | What it does |
 |---|---|
-| `Login.jsx` | Badge/password form → `authAPI.login()`. "Seed Demo" button calls `authAPI.seedDemo()` and pre-fills credentials. |
-| `Dashboard.jsx` | On mount fetches `dashboardAPI.getStats()` and `patternsAPI.getMOAlerts()`. Renders Recharts `BarChart` (district breakdown) and `PieChart` (risk distribution). Shows ChromaDB vector count. |
-| `FIRAnalysis.jsx` | Drag-and-drop or text input. Optionally saves to DB via `firsAPI.upload()`. Always calls `analysisAPI.analyzeFIR()`. Displays entities, IPC sections with animated confidence bars, similar cases from ChromaDB, and next steps. |
-| `CaseIntelligence.jsx` | Left: filterable FIR list from `firsAPI.list()`. Right: detail panel. Clicking a case fetches `analysisAPI.getSimilar()` if indexed. "Re-train" button triggers `firsAPI.train()`. |
-| `MOPatterns.jsx` | Fetches all patterns on mount. Left: pattern cards coloured by risk (critical ones animate). Right: detail with description, affected districts, linked FIR UUIDs, and recommended action. |
-| `LegalAssistant.jsx` | Chat-style UI. Sends query via `legalAPI.search()`. Renders responses with lightweight markdown parsing (bold, bullet lists). Sidebar of 6 quick-query shortcuts. Shows source citations. |
-| `MalayalamFIR.jsx` | Structured form for FIR fields. On submit, assembles English text and calls `bhashiniAPI.translate()`. Renders the Malayalam output in `Noto Sans Malayalam` font with copy/print options. |
+| `Login.jsx` | Badge/password form → `authAPI.login()`. Shows Kerala Police branding with illustration panel. |
+| `RequestAccess.jsx` | New officer registration form for access requests. |
+| `Dashboard.jsx` | On mount fetches `dashboardAPI.getStats()` and `patternsAPI.getMOAlerts()`. Displays stat cards (total FIRs, high risk, indexed, open cases), district breakdown, and ChromaDB vector count. |
+| `FIRAnalysis.jsx` | Text input or file upload. Calls `analysisAPI.analyzeFIR()`. Displays extracted entities, IPC sections with confidence bars, similar cases from ChromaDB, risk level badge, MO pattern, AI summary, and next investigation steps. |
+| `CaseIntelligence.jsx` | Left panel: filterable FIR list from `firsAPI.list()`. Right panel: FIR detail view. Clicking a case fetches `analysisAPI.getSimilar()` for similar cases. "Re-train" button triggers `firsAPI.train()`. |
+| `MOPatterns.jsx` | Fetches all patterns on mount. Displays pattern cards colored by risk level (critical=red, high=orange, medium=yellow). Shows description, affected districts, linked FIR IDs, and recommended police action. |
+| `LegalAssistant.jsx` | Chat-style UI. Sends query via `legalAPI.search()`. Renders legal answers with citations. Sidebar with quick-query shortcuts for common legal queries. |
+| `MalayalamFIR.jsx` | Structured FIR form (case number, station, complainant details). On submit, assembles English text and calls `bhashiniAPI.translate()`. Renders Malayalam output with copy/print options. |
 
 ---
 
@@ -483,6 +830,7 @@ Full interactive docs at **http://localhost:8000/api/docs** (Swagger UI).
 |---|---|---|---|
 | `POST` | `/api/auth/login` | ❌ | Officer login → JWT |
 | `POST` | `/api/auth/seed-demo` | ❌ | Seed demo officers (dev only) |
+| `POST` | `/api/auth/register` | ❌ | Register new officer |
 | `GET` | `/api/auth/me` | ✅ | Current officer info |
 | `POST` | `/api/firs/upload` | ✅ | Upload FIR (PDF/text form) |
 | `GET` | `/api/firs/` | ✅ | List all FIRs (with filters) |
@@ -490,7 +838,7 @@ Full interactive docs at **http://localhost:8000/api/docs** (Swagger UI).
 | `POST` | `/api/firs/{id}/train` | ✅ | Re-run NLP pipeline |
 | `POST` | `/api/analysis/analyze-fir` | ✅ | Full AI analysis (inline) |
 | `GET` | `/api/analysis/similar/{id}` | ✅ | Semantic similar FIRs |
-| `POST` | `/api/legal/search` | ✅ | IPC/CrPC/judgment search |
+| `POST` | `/api/legal/search` | ✅ | IPC/CrPC/BNS/judgment search |
 | `GET` | `/api/patterns/mo-alerts` | ✅ | Live MO pattern alerts |
 | `GET` | `/api/dashboard/stats` | ✅ | Live dashboard numbers |
 | `GET` | `/api/dashboard/chroma-stats` | ✅ | ChromaDB index count |
@@ -547,16 +895,131 @@ When another FIR is uploaded later, its vector is compared against all existing 
 
 ---
 
+## Data Flow — Request Lifecycle
+
+### Login Flow
+```
+User enters KP001 + test1234
+    → Login.jsx calls AuthContext.login()
+        → authAPI.login() sends POST /api/auth/login
+            → Axios interceptor adds Content-Type header
+            → Vite proxy (dev) or Nginx (prod) forwards to backend:8000
+                → auth.py looks up Officer by badge_number in PostgreSQL
+                → bcrypt.checkpw() verifies password hash
+                → create_access_token() generates JWT with {sub: "KP001", role: "sub_inspector"}
+                → Returns {access_token: "eyJ...", officer: {id, name, station, ...}}
+            ← Response travels back through proxy
+        ← AuthContext stores token in localStorage, sets officer state
+    ← App.jsx re-renders: officer is now set
+    ← /login route condition: officer ? Navigate("/") : Login
+    ← User is redirected to Dashboard
+```
+
+### FIR Analysis Flow
+```
+Officer pastes FIR text → clicks "Analyse"
+    → FIRAnalysis.jsx calls analysisAPI.analyzeFIR(text)
+        → Axios adds JWT: "Authorization: Bearer eyJ..."
+        → POST /api/analysis/analyze-fir { text: "...", language: "en" }
+            → analysis.py:
+                1. nlp_service.extract_entities(text)
+                   → spaCy finds PERSON/GPE/DATE entities
+                   → regex finds weapon, vehicle, property
+                2. nlp_service.suggest_ipc_sections(text, entities)
+                   → scores 24 IPC sections by keyword match
+                   → returns top 5 with confidence scores
+                3. nlp_service.get_crime_category() → "Property"
+                4. nlp_service.get_risk_level() → "high"
+                5. nlp_service.detect_mo_pattern() → "House Breaking"
+                6. nlp_service.generate_summary() → structured text
+                7. nlp_service.generate_next_steps() → ["Secure scene", ...]
+                8. embedding_service.embed(text) → [0.12, -0.34, ...] (384 floats)
+                9. chroma_service.search_similar(vector, k=5)
+                   → HNSW approximate nearest neighbor search
+                   → returns [{fir_id, similarity: 0.87, metadata}, ...]
+                10. For each similar FIR: fetch snippet from PostgreSQL
+            → Returns AnalysisResponse JSON
+        ← FIRAnalysis.jsx renders results:
+           entities, IPC sections with animated bars,
+           similar cases panel, risk badge, next steps
+```
+
+### Legal Search Flow
+```
+Officer types "bail provisions for non-bailable offence"
+    → LegalAssistant.jsx calls legalAPI.search(query)
+        → POST /api/legal/search { query: "...", category: null }
+            → legal.py:
+                1. Loads ALL_LEGAL (IPC + CrPC + judgments + MVA + BNS + POCSO + DV)
+                2. For each item: count keyword matches + title match
+                3. Sort by score, return top 5
+                4. Format: top answer + related sections + citations
+            → Returns LegalSearchResponse
+        ← LegalAssistant.jsx renders answer in chat bubble
+           with citations and related sections
+```
+
+---
+
+## Design Decisions & Why
+
+### Why FastAPI over Django/Flask?
+- **Async natively** — PostgreSQL (asyncpg), HTTP calls (httpx), all non-blocking
+- **Auto-generated API docs** — Swagger UI at `/api/docs` for free
+- **Pydantic validation** — request/response models with automatic 422 errors
+- **Dependency injection** — `Depends(get_current_officer)` enforces auth cleanly
+
+### Why ChromaDB over Pinecone/Weaviate?
+- **Self-hosted** — no API costs, runs in Docker
+- **Simple** — HTTP client, one collection, cosine distance
+- **Good enough** — for thousands of FIRs, HNSW ANN is plenty fast
+
+### Why Rule-Based IPC Classification Instead of a Fine-Tuned LLM?
+- **Deterministic** — same input always gives same output (critical for legal advice)
+- **Explainable** — can show exactly which keywords triggered which section
+- **No hallucination risk** — never suggests a non-existent IPC section
+- **Fast** — no GPU needed, runs in milliseconds
+- **Easily extensible** — add a new section by adding a dict to `IPC_KNOWLEDGE_BASE`
+
+### Why `paraphrase-multilingual-MiniLM-L12-v2`?
+- **Multilingual** — handles English and Malayalam in the same vector space
+- **Small** — ~90 MB, loads fast, runs on CPU
+- **Good quality** — excellent for semantic similarity at this scale
+- **384 dimensions** — compact enough for ChromaDB without PCA reduction
+
+### Why Singleton Services?
+- `NLPService`, `EmbeddingService`, `ChromaService`, `BhashiniService` are all singletons
+- ML models are expensive to load (spaCy: ~200ms, sentence-transformer: ~2s)
+- Load once at startup, reuse across all requests
+
+### Why localStorage for Auth Instead of HttpOnly Cookies?
+- **Simpler** — Axios interceptor attaches token automatically
+- **SPA-friendly** — no CSRF complexity
+- **Trade-off acknowledged** — vulnerable to XSS, but acceptable for an internal police tool on trusted machines
+
+### Why Celery + Redis AND BackgroundTasks?
+- **BackgroundTasks** — for single FIR uploads (lightweight, in-process)
+- **Celery** — for bulk re-training, retry logic, and distributed processing when deploying across multiple servers
+
+---
+
 ## First-Time Usage
 
 1. Start the system (Docker or manual)
 2. Open http://localhost:5173
-3. Click **"Seed Demo Credentials"** on the login page → login as `KP001`
-4. Go to **FIR Analysis** → click **"Load Sample"** → click **"Run AI Analysis"**
-5. See entities, IPC sections, risk level, and investigation steps
-6. Enable **"Save & Index"**, fill in case number/district/station, and click Analyse again to store in DB
-7. Go to **Case Intelligence** → see the FIR appear in the list
-8. Click **"Find Similar"** — currently empty since only one FIR is indexed
-9. Upload 2–3 more FIRs → similar cases will start appearing
-10. Go to **Legal Assistant** → type *"bail provisions 167 CrPC"* and press Send
-11. Go to **Malayalam FIR** → click Load Sample → Generate Malayalam FIR
+3. Seed demo credentials: run `curl -X POST http://localhost:8000/api/auth/seed-demo`
+4. Login as `KP001` / `test1234`
+5. Go to **FIR Analysis** → paste or upload a FIR → click **"Run AI Analysis"**
+6. See entities, IPC sections, risk level, and investigation steps
+7. Enable **"Save & Index"**, fill in case number/district/station, and click Analyse again to store in DB
+8. Go to **Case Intelligence** → see the FIR appear in the list
+9. Click **"Find Similar"** — currently empty since only one FIR is indexed
+10. Upload 2–3 more FIRs → similar cases will start appearing
+11. Go to **Legal Assistant** → type *"bail provisions 167 CrPC"* and press Send
+12. Go to **Malayalam FIR** → fill in the form → click Generate Malayalam FIR
+
+---
+
+## License
+
+This project is built for educational and internal demonstration purposes for the Kerala Police department.

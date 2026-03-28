@@ -126,18 +126,18 @@ export default function FIRAnalysis() {
 
         {/* Configuration */}
         <div className="premium-card p-6">
-          <label className="flex items-center gap-3 cursor-pointer group">
+          <label className="flex items-center gap-3 cursor-pointer group" onClick={() => setSaveAndIndex(s => !s)}>
             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${saveAndIndex ? 'bg-brand-800 border-brand-800 text-white' : 'border-gray-300 bg-white group-hover:border-brand-800'}`}>
               {saveAndIndex && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
             </div>
-            <span className="text-sm font-medium text-gray-700">Save and index to Vector Database (ChromaDB)</span>
+            <span className="text-sm font-medium text-gray-700">Save and index to Vector Database (enables similar case search)</span>
           </label>
           
           {saveAndIndex && (
             <div className="grid grid-cols-3 gap-4 animate-fade-in mt-5 pt-5 border-t border-gray-100">
-              <input value={caseNumber} onChange={e => setCaseNumber(e.target.value)} placeholder="Case No." className="premium-input" />
-              <input value={district} onChange={e => setDistrict(e.target.value)} placeholder="District" className="premium-input" />
-              <input value={station} onChange={e => setStation(e.target.value)} placeholder="Station" className="premium-input" />
+              <input value={caseNumber} onChange={e => setCaseNumber(e.target.value)} placeholder="Case No. *" className="premium-input" />
+              <input value={district} onChange={e => setDistrict(e.target.value)} placeholder="District *" className="premium-input" />
+              <input value={station} onChange={e => setStation(e.target.value)} placeholder="Station *" className="premium-input" />
             </div>
           )}
         </div>

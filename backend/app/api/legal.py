@@ -95,26 +95,156 @@ JUDGMENT_KNOWLEDGE = [
     },
 ]
 
-SOP_KNOWLEDGE = [
+MOTOR_ACT_KNOWLEDGE = [
     {
-        "section": "BPR&D SOP — Crime Scene Management",
-        "title": "First Responding Officer Duties",
-        "answer": "First officer at scene must: (1) Ensure safety, (2) Cordon off scene, (3) Preserve evidence, (4) Record time of arrival, (5) Identify witnesses, (6) Photograph/video before any movement, (7) Maintain scene register. No evidence must be disturbed before FSL arrives.",
-        "keywords": ["crime scene", "first responder", "scene preservation", "fsl", "scene cordon", "evidence preservation"],
-        "category": "sop",
-        "citation": "BPR&D Standard Operating Procedures for Crime Scene Management",
+        "section": "185 MVA",
+        "title": "Driving Under Influence of Alcohol/Drugs",
+        "answer": "Section 185 of the Motor Vehicles Act provides punishment for driving under influence. Penalty: First offence — imprisonment up to 6 months and/or fine up to ₹10,000. Second offence within 3 years — imprisonment up to 2 years and/or fine up to ₹15,000. Breathalyzer test can be conducted by a traffic officer.",
+        "keywords": ["drunk driving", "drunken driving", "driving under influence", "alcohol limit", "breathalyzer", "drink and drive", "dui"],
+        "category": "motor",
+        "citation": "Section 185, Motor Vehicles Act, 1988 (Amended 2019)",
     },
     {
-        "section": "Kerala Police SOP — CCTNS Data Entry",
-        "title": "CCTNS FIR Entry Requirements",
-        "answer": "FIR must be entered in CCTNS within 24 hours of registration. All fields including IPC sections, complainant details, and location must be filled. District CCTNS coordinator must be informed of any technical issues.",
-        "keywords": ["cctns", "cctns entry", "fir entry system", "cctns registration", "digital fir"],
-        "category": "sop",
-        "citation": "Kerala Police CCTNS Implementation Manual, 2019",
+        "section": "184 MVA",
+        "title": "Dangerous Driving",
+        "answer": "Driving dangerously or at reckless speed on a public road. Penalty: First offence — imprisonment up to 6 months and/or fine up to ₹5,000. Second offence — imprisonment up to 2 years and/or fine up to ₹10,000.",
+        "keywords": ["dangerous driving", "reckless driving", "over-speeding accident", "negligent driving"],
+        "category": "motor",
+        "citation": "Section 184, Motor Vehicles Act, 1988",
+    },
+    {
+        "section": "304A IPC / 106 BNS",
+        "title": "Causing Death by Negligence (Motor Accident)",
+        "answer": "Whoever causes death of any person by doing any rash or negligent act not amounting to culpable homicide. In motor accident fatalities, Section 304A IPC (now 106 BNS) is typically invoked along with 279 IPC (rash driving). Punishment: Imprisonment up to 2 years + Fine.",
+        "keywords": ["accident death", "motor accident fatality", "rash driving death", "hit and run death", "road accident kill", "vehicle accident killing"],
+        "category": "motor",
+        "citation": "Section 304A IPC / Section 106 BNS 2023",
+    },
+    {
+        "section": "279 IPC / 281 BNS",
+        "title": "Rash Driving or Riding on Public Way",
+        "answer": "Whoever drives any vehicle or rides on any public way in a manner so rash or negligent as to endanger human life. Punishment: Imprisonment up to 6 months or Fine up to ₹1000, or Both. Often charged alongside 304A in fatal accidents.",
+        "keywords": ["rash driving", "negligent driving", "speeding", "overspeeding", "road accident", "atv accident", "two wheeler rash"],
+        "category": "motor",
+        "citation": "Section 279 IPC / Section 281 BNS 2023",
+    },
+    {
+        "section": "132 MVA",
+        "title": "Driving Without Licence",
+        "answer": "Section 132 read with Section 181 MVA — Driving a motor vehicle without a valid driving licence. Penalty: Fine up to ₹5,000 (first offence, under 2019 amendment). Imprisonment up to 3 months or fine may also apply.",
+        "keywords": ["no licence", "driving without license", "unlicensed driver", "driving licence offence"],
+        "category": "motor",
+        "citation": "Section 132 read with Section 181, Motor Vehicles Act, 1988 (Amended 2019)",
+    },
+    {
+        "section": "161 MVA",
+        "title": "Hit and Run — Compensation",
+        "answer": "Under the Solatium Fund Scheme, victims of hit-and-run accidents (where the offending vehicle is unknown) are entitled to compensation: ₹2 lakh for death, ₹50,000 for grievous hurt. Police must file a specific Form 1A report to the Claims Tribunal.",
+        "keywords": ["hit and run", "vehicle fled", "unknown vehicle accident", "solatium fund", "compensation accident"],
+        "category": "motor",
+        "citation": "Section 161, Motor Vehicles Act, 1988; Solatium Fund Scheme",
     },
 ]
 
-ALL_LEGAL = IPC_KNOWLEDGE_BASE + CRPC_KNOWLEDGE + JUDGMENT_KNOWLEDGE + SOP_KNOWLEDGE
+BNS_KNOWLEDGE = [
+    {
+        "section": "103 BNS",
+        "title": "Murder (BNS 2023 — replaces IPC 302)",
+        "answer": "Section 103 of Bharatiya Nyaya Sanhita 2023 replaces IPC Section 302. Punishment for murder remains death or life imprisonment with fine. The BNS came into force on 1 July 2024. All new FIRs from 1 July 2024 must cite BNS sections.",
+        "keywords": ["bns murder", "bns 103", "bharatiya nyaya sanhita murder", "new criminal law murder"],
+        "category": "bns",
+        "citation": "Section 103, Bharatiya Nyaya Sanhita, 2023 (effective 1 July 2024)",
+    },
+    {
+        "section": "309 BNS",
+        "title": "Theft (BNS 2023 — replaces IPC 379)",
+        "answer": "Section 309 BNS replaces IPC 379. Punishment remains imprisonment up to 3 years + Fine. The procedure under BNSS 2023 (replaces CrPC) applies for all new cases from 1 July 2024.",
+        "keywords": ["bns theft", "bns 309", "new law theft", "bharatiya nyaya sanhita theft"],
+        "category": "bns",
+        "citation": "Section 309, Bharatiya Nyaya Sanhita, 2023",
+    },
+    {
+        "section": "316 BNS",
+        "title": "Cheating (BNS 2023 — replaces IPC 420)",
+        "answer": "Section 316 BNS replaces IPC Section 420. Fraud, cheating, and dishonest inducement remains punishable with imprisonment up to 7 years + Fine.",
+        "keywords": ["bns cheating", "bns 316", "new law fraud", "bharatiya nyaya sanhita fraud"],
+        "category": "bns",
+        "citation": "Section 316, Bharatiya Nyaya Sanhita, 2023",
+    },
+    {
+        "section": "BNSS Overview",
+        "title": "Bharatiya Nagarik Suraksha Sanhita 2023 (BNSS) — replaces CrPC",
+        "answer": "The Bharatiya Nagarik Suraksha Sanhita (BNSS) 2023 replaced the Code of Criminal Procedure (CrPC) 1973 with effect from 1 July 2024. Key changes: (1) Trials to be concluded within 3 years, (2) Video-conference trials allowed, (3) Maximum police custody extended to 60 days for serious offences, (4) e-FIR facility, (5) Zero FIR allowed and to be transferred within 15 days.",
+        "keywords": ["bnss", "new crpc", "replacement crpc", "2024 criminal procedure", "new criminal laws", "bharatiya nagarik suraksha sanhita"],
+        "category": "bns",
+        "citation": "Bharatiya Nagarik Suraksha Sanhita, 2023 (effective 1 July 2024)",
+    },
+    {
+        "section": "175 BNSS",
+        "title": "Zero FIR (BNSS)",
+        "answer": "Under BNSS 2023, Section 175 codifies Zero FIR — an FIR registered at any police station regardless of jurisdiction. It must be transferred to the jurisdictionally correct police station within 15 days. This was previously only case law (established by courts).",
+        "keywords": ["zero fir", "zero fir bnss", "fir without jurisdiction", "any station fir", "inter-district fir"],
+        "category": "bns",
+        "citation": "Section 175, Bharatiya Nagarik Suraksha Sanhita, 2023",
+    },
+]
+
+POCSO_KNOWLEDGE = [
+    {
+        "section": "4 POCSO",
+        "title": "Penetrative Sexual Assault on Child (POCSO)",
+        "answer": "Section 4 POCSO provides punishment for penetrative sexual assault. Minimum 20 years imprisonment, may extend to life imprisonment and fine. Victim must be below 18 years. Investigation must be completed within 30 days. Trial to be completed within one year in Special Court.",
+        "keywords": ["pocso", "child sexual abuse", "assault on child", "minor raped", "sexual assault child", "pocso case"],
+        "category": "pocso",
+        "citation": "Section 4, Protection of Children from Sexual Offences Act, 2012 (Amended 2019)",
+    },
+    {
+        "section": "8 POCSO",
+        "title": "Sexual Assault (Non-Penetrative) on Child",
+        "answer": "Sexual assault (non-penetrative) of a child under POCSO. Punishment: Minimum 3 years, up to 5 years, with fine. Child is defined as below 18 years. Reporting obligation: Any person aware of a POCSO offence MUST report to police or face imprisonment up to 6 months.",
+        "keywords": ["pocso sexual assault", "groping child", "touching child inappropriately", "minor molestation", "child groping"],
+        "category": "pocso",
+        "citation": "Section 8, Protection of Children from Sexual Offences Act, 2012",
+    },
+    {
+        "section": "21 POCSO",
+        "title": "Mandatory Reporting Obligation (POCSO)",
+        "answer": "Under Section 21 POCSO, failure to report knowledge of sexual offence against a child is an offence. Punishment: Imprisonment up to 6 months or Fine. This applies to all citizens and institutions, including hospitals, schools, and NGOs.",
+        "keywords": ["pocso mandatory reporting", "failure report child abuse", "doctor report pocso", "school report abuse"],
+        "category": "pocso",
+        "citation": "Section 21, Protection of Children from Sexual Offences Act, 2012",
+    },
+]
+
+DOMESTIC_VIOLENCE_KNOWLEDGE = [
+    {
+        "section": "DV Act 2005",
+        "title": "Protection of Women from Domestic Violence Act 2005",
+        "answer": "The Protection of Women from Domestic Violence Act 2005 provides protection orders, residence orders, and monetary relief. Aggrieved woman can approach Protection Officer or court. Domestic violence includes physical, verbal, emotional, sexual, and economic abuse. Court can issue protection order within 3 working days of application. Violation of protection order is a criminal offence.",
+        "keywords": ["domestic violence act", "dv act", "protection order", "residence order", "domestic abuse woman", "spouse violence"],
+        "category": "domestic_violence",
+        "citation": "Protection of Women from Domestic Violence Act, 2005",
+    },
+    {
+        "section": "498A IPC / 85 BNS",
+        "title": "Cruelty by Husband or Relatives (Dowry Harassment)",
+        "answer": "Section 498A IPC (now 85 BNS) — Husband or relative subjecting woman to cruelty. This covers dowry harassment, physical abuse by in-laws. Punishment: Imprisonment up to 3 years + Fine. It is a cognizable, non-bailable offence. Arnesh Kumar guidelines mandate that police must not automatically arrest without applying the checklist from the Supreme Court.",
+        "keywords": ["dowry", "dowry demand", "498a", "cruelty husband", "wife beating husband", "in-laws harassment", "matrimonial cruelty", "bns 85"],
+        "category": "domestic_violence",
+        "citation": "Section 498A IPC / Section 85 BNS 2023; Arnesh Kumar v. Bihar (2014)",
+    },
+]
+
+ALL_LEGAL = (
+    IPC_KNOWLEDGE_BASE
+    + CRPC_KNOWLEDGE
+    + JUDGMENT_KNOWLEDGE
+    + MOTOR_ACT_KNOWLEDGE
+    + BNS_KNOWLEDGE
+    + POCSO_KNOWLEDGE
+    + DOMESTIC_VIOLENCE_KNOWLEDGE
+)
+
 
 
 def search_legal_kb(query: str, category: str = None) -> list:

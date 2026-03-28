@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './components/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
@@ -12,17 +12,16 @@ import MalayalamFIR from './pages/MalayalamFIR'
 
 function PrivateRoute({ children }) {
   const { officer } = useAuth()
-  return officer ? children : <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!officer) return <Navigate to="/login" state={{ from: location }} replace />
+  return children
 }
 
 function AppRoutes() {
   const { officer } = useAuth()
-  if (location.pathname === '/login' && officer) {
-    return <Navigate to="/" replace />
-  }
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={officer ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/request-access" element={<RequestAccess />} />
       <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
       <Route path="/fir" element={<PrivateRoute><Layout><FIRAnalysis /></Layout></PrivateRoute>} />

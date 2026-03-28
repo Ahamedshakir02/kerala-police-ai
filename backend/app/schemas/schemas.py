@@ -54,6 +54,7 @@ class IPCSection(BaseModel):
     description: str
     punishment: str
     confidence: float
+    bailable: bool = False
 
 
 class ExtractedEntities(BaseModel):
