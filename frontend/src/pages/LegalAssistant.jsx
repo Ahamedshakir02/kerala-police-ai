@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { legalAPI } from '../api'
 import toast from 'react-hot-toast'
-import { BookOpen, Sparkles, Send, Scale, FileText, ChevronRight } from 'lucide-react'
+import { BookOpen, Sparkles, Send, Scale, FileText, ChevronRight, AlertTriangle, Bot, Zap } from 'lucide-react'
 
 const QUICK_QUERIES = [
   { label: 'Bail — Sec 167 CrPC', q: 'What are the bail provisions under Section 167 CrPC? When does default bail apply?' },
@@ -16,6 +16,33 @@ const QUICK_QUERIES = [
   { label: 'NDPS Act — Narcotics', q: 'What are NDPS Act sections for cannabis and psychotropic substances? What are the penalties?' },
 ]
 
+function SourceBadge({ source, isFallback }) {
+  if (isFallback) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+        <Zap size={12} /> Keyword Search
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+      <Bot size={12} /> Gemini AI
+    </span>
+  )
+}
+
+function FallbackWarning() {
+  return (
+    <div className="flex items-start gap-3 px-5 py-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-800 animate-fade-in mb-4">
+      <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-amber-600" />
+      <div>
+        <p className="font-bold">AI model unavailable — showing keyword search results</p>
+        <p className="text-amber-600 text-xs mt-0.5">Set <code className="bg-amber-100 px-1 rounded">GEMINI_API_KEY</code> in backend .env for AI-powered responses</p>
+      </div>
+    </div>
+  )
+}
+
 function MessageBubble({ msg }) {
   const isUser = msg.role === 'user'
   return (
@@ -27,6 +54,9 @@ function MessageBubble({ msg }) {
       </div>
       
       <div className={`max-w-2xl ${isUser ? 'text-right' : ''}`}>
+        {/* Fallback warning — only for assistant messages */}
+        {!isUser && msg.is_fallback && <FallbackWarning />}
+        
         <div className={`px-6 py-4 rounded-3xl text-[15px] leading-relaxed relative ${
           isUser
             ? 'bg-brand-800 text-white rounded-tr-sm shadow-sm'
@@ -46,15 +76,15 @@ function MessageBubble({ msg }) {
           })}
         </div>
         
-        {msg.sections?.length > 0 && (
-          <div className={`mt-4 flex flex-wrap gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-            {msg.sections.slice(0, 4).map((s, i) => (
-              <span key={i} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-100 bg-brand-50 text-brand-800 flex items-center gap-1.5 shadow-sm">
-                <Scale size={12} /> § {s.section}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Source badge + sections */}
+        <div className={`mt-3 flex flex-wrap items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          {!isUser && msg.source && <SourceBadge source={msg.source} isFallback={msg.is_fallback} />}
+          {msg.sections?.length > 0 && msg.sections.slice(0, 4).map((s, i) => (
+            <span key={i} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-100 bg-brand-50 text-brand-800 flex items-center gap-1.5 shadow-sm">
+              <Scale size={12} /> § {s.section}
+            </span>
+          ))}
+        </div>
         
         {msg.citations?.length > 0 && (
           <div className={`mt-3 text-xs font-medium flex items-center gap-2 ${isUser ? 'justify-end text-brand-200' : 'justify-start text-gray-400'}`}>
@@ -69,15 +99,28 @@ function MessageBubble({ msg }) {
 export default function LegalAssistant() {
   const [messages, setMessages] = useState([{
     role: 'assistant',
-    content: `Hello. I am the AI Legal Assistant for Kerala Police.\n\nI have access to the latest IPC Sections, CrPC provisions, Supreme Court precedents, and BPR&D Standard Operating Procedures. How can I assist you with your investigation today?`,
+    content: `Hello. I am the AI Legal Assistant for Kerala Police.\n\nI have access to the latest IPC Sections, CrPC provisions, Supreme Court precedents, BNS/BNSS updates, and POCSO guidelines.\n\nHow can I assist you with your investigation today?`,
     sections: [],
     citations: [],
+    source: null,
+    is_fallback: false,
   }])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEnd = useRef(null)
 
   useEffect(() => { messagesEnd.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  const clearChat = () => {
+    setMessages([{
+      role: 'assistant',
+      content: `Chat cleared. How can I help you?`,
+      sections: [],
+      citations: [],
+      source: null,
+      is_fallback: false,
+    }])
+  }
 
   const sendQuery = async (q) => {
     const text = q || query.trim()
@@ -86,7 +129,7 @@ export default function LegalAssistant() {
     setMessages(prev => [...prev, { role: 'user', content: text }])
     setLoading(true)
     try {
-      const res = await legalAPI.search(text)
+      const res = await legalAPI.chat(text)
       const data = res.data
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -94,6 +137,8 @@ export default function LegalAssistant() {
         sections: data.sections,
         citations: data.citations,
         confidence: data.confidence,
+        is_fallback: data.is_fallback,
+        source: data.source,
       }])
     } catch {
       toast.error('Legal search failed')
@@ -102,6 +147,8 @@ export default function LegalAssistant() {
         content: 'Connection timeout. Unable to reach the legal knowledge base.',
         sections: [],
         citations: [],
+        is_fallback: true,
+        source: 'error',
       }])
     } finally { setLoading(false) }
   }
@@ -145,7 +192,8 @@ export default function LegalAssistant() {
               <span className="bg-white border border-gray-100 px-2 py-0.5 rounded-md text-xs font-bold">Updated</span>
             </div>
             <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-500" /> SC Precedent Library</div>
-            <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-500" /> Crime Scene SOPs</div>
+            <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-500" /> POCSO & DV Act</div>
+            <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-brand-500" /> Motor Vehicles Act</div>
           </div>
         </div>
       </div>
@@ -163,11 +211,14 @@ export default function LegalAssistant() {
               <p className="text-lg font-bold text-gray-900 tracking-tight">Legal Intelligence</p>
               <p className="text-xs font-medium text-brand-700 flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-pulse"></span>
-                Engine Online and Ready
+                Gemini AI + Knowledge Base Active
               </p>
             </div>
           </div>
-          <button className="text-sm font-bold text-gray-500 bg-surface-50 px-4 py-2 rounded-xl hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200">
+          <button 
+            onClick={clearChat}
+            className="text-sm font-bold text-gray-500 bg-surface-50 px-4 py-2 rounded-xl hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200"
+          >
             Clear Chat
           </button>
         </div>
@@ -217,7 +268,7 @@ export default function LegalAssistant() {
             </button>
           </div>
           <p className="text-center text-[11px] font-medium text-gray-400 mt-4">
-            AI can make mistakes. Verify legal citations with official BPR&D/CrPC manuals before taking action.
+            Powered by Google Gemini AI with RAG • Verify legal citations with official manuals before taking action.
           </p>
         </div>
 

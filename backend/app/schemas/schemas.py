@@ -141,6 +141,16 @@ class LegalSearchResponse(BaseModel):
     confidence: float
 
 
+class LegalChatResponse(BaseModel):
+    query: str
+    answer: str
+    sections: List[Dict[str, Any]]
+    citations: List[str]
+    confidence: float
+    is_fallback: bool = False      # True when using keyword search fallback
+    source: str = "gemini"         # "gemini" or "keyword_search"
+
+
 # ── Bhashini ──────────────────────────────────────────────────────
 class TranslationRequest(BaseModel):
     text: str

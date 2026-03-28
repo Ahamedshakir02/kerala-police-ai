@@ -1,14 +1,15 @@
-"""Legal Guidance API — IPC/CrPC keyword search and AI legal assistant"""
+﻿"""Legal Guidance API â€” IPC/CrPC keyword search and AI legal assistant"""
 
 from fastapi import APIRouter, Depends
 from app.core.security import get_current_officer
 from app.models.officer import Officer
-from app.schemas.schemas import LegalSearchRequest, LegalSearchResponse
+from app.schemas.schemas import LegalSearchRequest, LegalSearchResponse, LegalChatResponse
 from app.services.nlp_service import IPC_KNOWLEDGE_BASE
+from app.services.gemini_service import get_gemini_service
 
 router = APIRouter()
 
-# ── Extended Legal Knowledge Base ──────────────────────────────────────────────
+# â”€â”€ Extended Legal Knowledge Base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 CRPC_KNOWLEDGE = [
     {
         "section": "41 CrPC",
@@ -99,7 +100,7 @@ MOTOR_ACT_KNOWLEDGE = [
     {
         "section": "185 MVA",
         "title": "Driving Under Influence of Alcohol/Drugs",
-        "answer": "Section 185 of the Motor Vehicles Act provides punishment for driving under influence. Penalty: First offence — imprisonment up to 6 months and/or fine up to ₹10,000. Second offence within 3 years — imprisonment up to 2 years and/or fine up to ₹15,000. Breathalyzer test can be conducted by a traffic officer.",
+        "answer": "Section 185 of the Motor Vehicles Act provides punishment for driving under influence. Penalty: First offence â€” imprisonment up to 6 months and/or fine up to â‚¹10,000. Second offence within 3 years â€” imprisonment up to 2 years and/or fine up to â‚¹15,000. Breathalyzer test can be conducted by a traffic officer.",
         "keywords": ["drunk driving", "drunken driving", "driving under influence", "alcohol limit", "breathalyzer", "drink and drive", "dui"],
         "category": "motor",
         "citation": "Section 185, Motor Vehicles Act, 1988 (Amended 2019)",
@@ -107,7 +108,7 @@ MOTOR_ACT_KNOWLEDGE = [
     {
         "section": "184 MVA",
         "title": "Dangerous Driving",
-        "answer": "Driving dangerously or at reckless speed on a public road. Penalty: First offence — imprisonment up to 6 months and/or fine up to ₹5,000. Second offence — imprisonment up to 2 years and/or fine up to ₹10,000.",
+        "answer": "Driving dangerously or at reckless speed on a public road. Penalty: First offence â€” imprisonment up to 6 months and/or fine up to â‚¹5,000. Second offence â€” imprisonment up to 2 years and/or fine up to â‚¹10,000.",
         "keywords": ["dangerous driving", "reckless driving", "over-speeding accident", "negligent driving"],
         "category": "motor",
         "citation": "Section 184, Motor Vehicles Act, 1988",
@@ -123,7 +124,7 @@ MOTOR_ACT_KNOWLEDGE = [
     {
         "section": "279 IPC / 281 BNS",
         "title": "Rash Driving or Riding on Public Way",
-        "answer": "Whoever drives any vehicle or rides on any public way in a manner so rash or negligent as to endanger human life. Punishment: Imprisonment up to 6 months or Fine up to ₹1000, or Both. Often charged alongside 304A in fatal accidents.",
+        "answer": "Whoever drives any vehicle or rides on any public way in a manner so rash or negligent as to endanger human life. Punishment: Imprisonment up to 6 months or Fine up to â‚¹1000, or Both. Often charged alongside 304A in fatal accidents.",
         "keywords": ["rash driving", "negligent driving", "speeding", "overspeeding", "road accident", "atv accident", "two wheeler rash"],
         "category": "motor",
         "citation": "Section 279 IPC / Section 281 BNS 2023",
@@ -131,15 +132,15 @@ MOTOR_ACT_KNOWLEDGE = [
     {
         "section": "132 MVA",
         "title": "Driving Without Licence",
-        "answer": "Section 132 read with Section 181 MVA — Driving a motor vehicle without a valid driving licence. Penalty: Fine up to ₹5,000 (first offence, under 2019 amendment). Imprisonment up to 3 months or fine may also apply.",
+        "answer": "Section 132 read with Section 181 MVA â€” Driving a motor vehicle without a valid driving licence. Penalty: Fine up to â‚¹5,000 (first offence, under 2019 amendment). Imprisonment up to 3 months or fine may also apply.",
         "keywords": ["no licence", "driving without license", "unlicensed driver", "driving licence offence"],
         "category": "motor",
         "citation": "Section 132 read with Section 181, Motor Vehicles Act, 1988 (Amended 2019)",
     },
     {
         "section": "161 MVA",
-        "title": "Hit and Run — Compensation",
-        "answer": "Under the Solatium Fund Scheme, victims of hit-and-run accidents (where the offending vehicle is unknown) are entitled to compensation: ₹2 lakh for death, ₹50,000 for grievous hurt. Police must file a specific Form 1A report to the Claims Tribunal.",
+        "title": "Hit and Run â€” Compensation",
+        "answer": "Under the Solatium Fund Scheme, victims of hit-and-run accidents (where the offending vehicle is unknown) are entitled to compensation: â‚¹2 lakh for death, â‚¹50,000 for grievous hurt. Police must file a specific Form 1A report to the Claims Tribunal.",
         "keywords": ["hit and run", "vehicle fled", "unknown vehicle accident", "solatium fund", "compensation accident"],
         "category": "motor",
         "citation": "Section 161, Motor Vehicles Act, 1988; Solatium Fund Scheme",
@@ -149,7 +150,7 @@ MOTOR_ACT_KNOWLEDGE = [
 BNS_KNOWLEDGE = [
     {
         "section": "103 BNS",
-        "title": "Murder (BNS 2023 — replaces IPC 302)",
+        "title": "Murder (BNS 2023 â€” replaces IPC 302)",
         "answer": "Section 103 of Bharatiya Nyaya Sanhita 2023 replaces IPC Section 302. Punishment for murder remains death or life imprisonment with fine. The BNS came into force on 1 July 2024. All new FIRs from 1 July 2024 must cite BNS sections.",
         "keywords": ["bns murder", "bns 103", "bharatiya nyaya sanhita murder", "new criminal law murder"],
         "category": "bns",
@@ -157,7 +158,7 @@ BNS_KNOWLEDGE = [
     },
     {
         "section": "309 BNS",
-        "title": "Theft (BNS 2023 — replaces IPC 379)",
+        "title": "Theft (BNS 2023 â€” replaces IPC 379)",
         "answer": "Section 309 BNS replaces IPC 379. Punishment remains imprisonment up to 3 years + Fine. The procedure under BNSS 2023 (replaces CrPC) applies for all new cases from 1 July 2024.",
         "keywords": ["bns theft", "bns 309", "new law theft", "bharatiya nyaya sanhita theft"],
         "category": "bns",
@@ -165,7 +166,7 @@ BNS_KNOWLEDGE = [
     },
     {
         "section": "316 BNS",
-        "title": "Cheating (BNS 2023 — replaces IPC 420)",
+        "title": "Cheating (BNS 2023 â€” replaces IPC 420)",
         "answer": "Section 316 BNS replaces IPC Section 420. Fraud, cheating, and dishonest inducement remains punishable with imprisonment up to 7 years + Fine.",
         "keywords": ["bns cheating", "bns 316", "new law fraud", "bharatiya nyaya sanhita fraud"],
         "category": "bns",
@@ -173,7 +174,7 @@ BNS_KNOWLEDGE = [
     },
     {
         "section": "BNSS Overview",
-        "title": "Bharatiya Nagarik Suraksha Sanhita 2023 (BNSS) — replaces CrPC",
+        "title": "Bharatiya Nagarik Suraksha Sanhita 2023 (BNSS) â€” replaces CrPC",
         "answer": "The Bharatiya Nagarik Suraksha Sanhita (BNSS) 2023 replaced the Code of Criminal Procedure (CrPC) 1973 with effect from 1 July 2024. Key changes: (1) Trials to be concluded within 3 years, (2) Video-conference trials allowed, (3) Maximum police custody extended to 60 days for serious offences, (4) e-FIR facility, (5) Zero FIR allowed and to be transferred within 15 days.",
         "keywords": ["bnss", "new crpc", "replacement crpc", "2024 criminal procedure", "new criminal laws", "bharatiya nagarik suraksha sanhita"],
         "category": "bns",
@@ -182,7 +183,7 @@ BNS_KNOWLEDGE = [
     {
         "section": "175 BNSS",
         "title": "Zero FIR (BNSS)",
-        "answer": "Under BNSS 2023, Section 175 codifies Zero FIR — an FIR registered at any police station regardless of jurisdiction. It must be transferred to the jurisdictionally correct police station within 15 days. This was previously only case law (established by courts).",
+        "answer": "Under BNSS 2023, Section 175 codifies Zero FIR â€” an FIR registered at any police station regardless of jurisdiction. It must be transferred to the jurisdictionally correct police station within 15 days. This was previously only case law (established by courts).",
         "keywords": ["zero fir", "zero fir bnss", "fir without jurisdiction", "any station fir", "inter-district fir"],
         "category": "bns",
         "citation": "Section 175, Bharatiya Nagarik Suraksha Sanhita, 2023",
@@ -228,7 +229,7 @@ DOMESTIC_VIOLENCE_KNOWLEDGE = [
     {
         "section": "498A IPC / 85 BNS",
         "title": "Cruelty by Husband or Relatives (Dowry Harassment)",
-        "answer": "Section 498A IPC (now 85 BNS) — Husband or relative subjecting woman to cruelty. This covers dowry harassment, physical abuse by in-laws. Punishment: Imprisonment up to 3 years + Fine. It is a cognizable, non-bailable offence. Arnesh Kumar guidelines mandate that police must not automatically arrest without applying the checklist from the Supreme Court.",
+        "answer": "Section 498A IPC (now 85 BNS) â€” Husband or relative subjecting woman to cruelty. This covers dowry harassment, physical abuse by in-laws. Punishment: Imprisonment up to 3 years + Fine. It is a cognizable, non-bailable offence. Arnesh Kumar guidelines mandate that police must not automatically arrest without applying the checklist from the Supreme Court.",
         "keywords": ["dowry", "dowry demand", "498a", "cruelty husband", "wife beating husband", "in-laws harassment", "matrimonial cruelty", "bns 85"],
         "category": "domestic_violence",
         "citation": "Section 498A IPC / Section 85 BNS 2023; Arnesh Kumar v. Bihar (2014)",
@@ -302,4 +303,71 @@ async def legal_search(
         sections=all_sections,
         citations=citations,
         confidence=round(confidence, 2),
+    )
+
+
+@router.post("/chat", response_model=LegalChatResponse)
+async def legal_chat(
+    req: LegalSearchRequest,
+    current_officer: Officer = Depends(get_current_officer),
+):
+    """
+    AI-powered legal chat using Google Gemini with RAG.
+    Falls back to keyword search if Gemini is unavailable.
+    """
+    gemini = get_gemini_service()
+
+    # Try Gemini LLM first
+    if gemini.is_available:
+        result = await gemini.chat(req.query, ALL_LEGAL)
+        if result:
+            return LegalChatResponse(
+                query=req.query,
+                answer=result["answer"],
+                sections=result["sections"],
+                citations=result["citations"],
+                confidence=result["confidence"],
+                is_fallback=False,
+                source="gemini",
+            )
+
+    # Fallback to keyword search
+    results = search_legal_kb(req.query, req.category)
+
+    if not results:
+        return LegalChatResponse(
+            query=req.query,
+            answer=(
+                f"No direct match found for '{req.query}' in the legal knowledge base. "
+                "Please consult the latest Kerala Police Legal Handbook or contact the District Legal Cell."
+            ),
+            sections=[],
+            citations=[],
+            confidence=0.0,
+            is_fallback=True,
+            source="keyword_search",
+        )
+
+    top = results[0]
+    all_sections = [
+        {"section": r["section"], "title": r["title"], "description": r.get("answer", r.get("description", ""))}
+        for r in results
+    ]
+    citations = list({r.get("citation", "") for r in results if r.get("citation")})
+
+    answer = top.get("answer", top.get("description", "Please refer to the relevant legal text."))
+    if len(results) > 1:
+        related = ", ".join([r["section"] for r in results[1:4]])
+        answer += f"\n\n**Related:** {related}"
+
+    confidence = min(0.95, 0.5 + len(results) * 0.1)
+
+    return LegalChatResponse(
+        query=req.query,
+        answer=answer,
+        sections=all_sections,
+        citations=citations,
+        confidence=round(confidence, 2),
+        is_fallback=True,
+        source="keyword_search",
     )

@@ -58,6 +58,8 @@ export const analysisAPI = {
 export const legalAPI = {
   search: (query, category) =>
     api.post('/legal/search', { query, category }),
+  chat: (query) =>
+    api.post('/legal/chat', { query }),
 }
 
 // ── Patterns ──────────────────────────────────────────────────────

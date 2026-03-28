@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Google Maps
     GOOGLE_MAPS_API_KEY: str = ""
 
+    # Google Gemini LLM
+    GEMINI_API_KEY: str = ""
+
     # App
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
